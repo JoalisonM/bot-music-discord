@@ -1,9 +1,11 @@
 <h2> 🎼 Bot de música discord 🦾 </h2>
 
 <h3> Dependências </h3>
-- pip install discord 
-- pip install discord.py[voice]
-- pip install youtube_dl
-- FFmpeg:
-	- sudo add-apt-repository ppa:mc3man/trusty-media
-	- sudo apt-get update || sudo apt-get upgrade || sudo apt-get install ffmpeg
+
+<ul>
+	<li>pip install discord</li>
+	<li>pip install discord.py[voice]</li>
+	<li>pip install youtube_dl</li>
+	<li>FFmpeg <ul><li>sudo add-apt-repository ppa:mc3man/trusty-media</li>
+<li>sudo apt-get update || sudo apt-get upgrade || sudo apt-get install ffmpeg</li>
+</ul></ul></li>
