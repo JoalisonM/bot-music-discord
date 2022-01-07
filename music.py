@@ -9,9 +9,9 @@ class bot_music(commands.Cog):
     self.is_playing = False
 
     self.music_queue = []
-    self.YDL_OPTIONS = {"format": "bestaudio", "noplaylist":"True"}
+    self.YDL_OPTIONS = {"format": "bestaudio", "noplaylist": "True"}
     self.FFMPEG_OPTIONS = {"before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5", "options": "-vn"}
-    self.vc = ""
+    self.voice = ""
 
   def search_youtube(self, music):
     with YoutubeDL(self.YDL_OPTIONS) as ydl:
@@ -22,7 +22,7 @@ class bot_music(commands.Cog):
     
     return {"source": info["formats"][0]["url"], "title": info["title"]}
 
-  async def play_next(self):
+  def play_next(self):
     if(len(self.music_queue) > 0):
       self.is_playing = True
 
@@ -30,7 +30,7 @@ class bot_music(commands.Cog):
 
       self.music_queue.pop(0)
 
-      self.vc.play(discord.FFmpegPCMAudio(m_url, **self.FFMPEG_OPTIONS), after=lambda e: self.play_next())
+      self.voice.play(discord.FFmpegPCMAudio(m_url, **self.FFMPEG_OPTIONS), after=lambda e: self.play_next())
     else:
       self.is_playing = False
   
@@ -40,16 +40,16 @@ class bot_music(commands.Cog):
 
       m_url = self.music_queue[0][0]["source"]
 
-      if(self.vc == "" or not self.vc.is_connected() or self.vc == None):
-        self.vc = await self.music_queue[0][1].connect()
+      if(self.voice == "" or not self.voice.is_connected() or self.voice == None):
+        self.voice = await self.music_queue[0][1].connect()
       else:
-        await self.vc.move_to(self.music_queue[0][1])
+        await self.voice.move_to(self.music_queue[0][1])
       
       print(self.music_queue)
 
       self.music_queue.pop(0)
 
-      self.vc.play(discord.FFmpegPCMAudio(m_url, **self.FFMPEG_OPTIONS), after=lambda e: self.play_next())
+      self.voice.play(discord.FFmpegPCMAudio(m_url, **self.FFMPEG_OPTIONS), after=lambda e: self.play_next())
     else:
       self.is_playing = False
   
@@ -57,15 +57,15 @@ class bot_music(commands.Cog):
   async def play(self, ctx, *args):
     query = " ".join(args)
 
-    voice_channel  = ctx.author.voice.channel
+    voice_channel = ctx.author.voice.channel
     if voice_channel is None:
-      await ctx.send("Conectado ao canal de voz!")
+      await ctx.send("Conecte a um canal de voz!")
     else:
       song = self.search_youtube(query)
       if type(song) == type(True):
         await ctx.send("Não foi possível baixar a música")
       else:
-        ctx.send("Música adicionada a fila")
+        await ctx.send("Música adicionada a fila")
         self.music_queue.append([song, voice_channel])
 
         if self.is_playing == False:
@@ -75,7 +75,7 @@ class bot_music(commands.Cog):
   async def queue(self, ctx):
     retval = ""
     for i in range(0, len(self.music_queue)):
-      retval += self.music_queue[i][0]["title"] + "\n"
+      retval += f"{i+1} - " + self.music_queue[i][0]["title"] + "\n"
     
     if retval != "":
       await ctx.send(retval)
@@ -84,11 +84,11 @@ class bot_music(commands.Cog):
   
   @commands.command(name="skip", help="Pra pular aquela música que o cbaa tá abusado")
   async def skip(self, ctx):
-    if self.vc != "" and self.vc:
-      self.vc.stop()
+    if self.voice != "" and self.voice:
+      self.voice.stop()
 
       await self.play_music()
   
   @commands.command(name="leave", help="Disconecta o bot do canal de voz")
   async def leave(self, ctx):
-    await self.vc.disconnect()
+    await self.voice.disconnect()
