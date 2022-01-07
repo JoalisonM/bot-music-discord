@@ -82,7 +82,7 @@ class bot_music(commands.Cog):
     else:
       await ctx.send("Não tem músicas na fila")
   
-  @commands.command(name="skip", help="Pra pular aquela música que o cbaa tá abusado")
+  @commands.command(name="skip", help="Pra pular aquela música que o caba tá abusado")
   async def skip(self, ctx):
     if self.voice != "" and self.voice:
       self.voice.stop()
