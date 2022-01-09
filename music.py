@@ -1,7 +1,14 @@
+import os
 import discord
+from dotenv import load_dotenv
 from discord.ext import commands
 from youtube_dl import YoutubeDL
 
+from faunadb import query as q
+from faunadb.objects import Ref
+from faunadb.client import FaunaClient
+
+load_dotenv()
 class bot_music(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
@@ -9,10 +16,15 @@ class bot_music(commands.Cog):
     self.is_playing = False
 
     self.music_queue = []
+    # self.music_playlists = []
     self.YDL_OPTIONS = {"format": "bestaudio", "noplaylist": "True"}
     self.FFMPEG_OPTIONS = {"before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5", "options": "-vn"}
+    
     self.voice = ""
 
+    self.db_client = FaunaClient(secret=os.getenv("FAUNADB_KEY"))
+
+  # Search musics on Youtube
   def search_youtube(self, music):
     with YoutubeDL(self.YDL_OPTIONS) as ydl:
       try:
@@ -89,6 +101,20 @@ class bot_music(commands.Cog):
 
       await self.play_music()
   
-  @commands.command(name="leave", help="Disconecta o bot do canal de voz")
-  async def leave(self, ctx):
-    await self.voice.disconnect()
+  # @commands.command(name="add_playlist", help="Cria uma playlist de músicas")
+  # async def add_playlist(self, ctx, name):
+  #   self.music_playlists.append({"name": name, "musics": []})
+  #   print(self.music_playlists)
+  #   await ctx.send("Playlist criada com sucesso!")
+  
+  # @commands.command(name="add", help="Adiciona música na playlist criada")
+  # async def add(self, ctx, name):
+  #   for i in self.music_playlists:
+  #     print(i[0]["name"])
+
+
+  @commands.command(name="db", help="Banco de dados")
+  async def db(self, ctx):
+    indexes = self.db_client.query(q.paginate(q.indexes()))
+
+    print(indexes)
