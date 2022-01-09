@@ -77,18 +77,6 @@ class bot_music(commands.Cog):
         if self.is_playing == False:
           await self.play_music()
   
-  @commands.command(name="queue", help="Lista as músicas que estão na fila")
-  async def queue(self, ctx):
-    
-    retval = ""
-    for i in range(0, len(self.music_queue)):
-      retval += f"{i+1} - " + self.music_queue[i][0]["title"] + "\n"
-    
-    if retval != "":
-      await ctx.send(retval)
-    else:
-      await ctx.send("Não tem músicas na fila")
-  
   @commands.command(name="skip", help="Pra pular aquela música que o caba tá abusado")
   async def skip(self, ctx):
     if self.voice != "" and self.voice:
@@ -102,7 +90,14 @@ class bot_music(commands.Cog):
       return
     else:
       await self.voice.disconnect()
-      await ctx.send("Bot desconectado do canal de voz")
+
+  @commands.command(name="queue", help="Lista todas as músicas da fila")
+  async def queue(self, ctx):
+    saida = "```python\nLISTA DE MÚSICAS\n"
+    for i in range(len(self.music_queue)):
+      saida += f"[{i}] {self.music_queue[i][2]}.\n"
+    saida += "```"
+    await ctx.send(saida)
 
   @commands.command(name="addplaylist", help="Cria uma playlist de músicas")
   async def addplaylist(self, ctx, name):
@@ -187,21 +182,3 @@ class bot_music(commands.Cog):
     )
 
     await ctx.send("Música adicionada à playlist %s"%(playlistDataName["name"]))
-
-  @commands.command(name="leave", help="Disconnecting bot from VC")
-  async def leave(self, ctx):
-    if(self.voice == "" or not self.voice.is_connected() or self.voice == None):
-      return
-    else:
-      await self.voice.disconnect()
-
-  @commands.command(name="queue", help="Lista todas as músicas da fila")
-  async def queue(self, ctx):
-    saida = "```python\nLISTA DE MÚSICAS\n"
-    for i in range(len(self.music_queue)):
-      saida += f"[{i}] {self.music_queue[i][2]}.\n"
-    saida += "```"
-    await ctx.send(saida)
-
-
-
