@@ -113,8 +113,46 @@ class bot_music(commands.Cog):
   #     print(i[0]["name"])
 
 
-  @commands.command(name="db", help="Banco de dados")
-  async def db(self, ctx):
-    indexes = self.db_client.query(q.paginate(q.indexes()))
+  @commands.command(name="add_play", help="Cria uma playlist de músicas")
+  async def add_play(self, ctx, name):
+    try:
 
-    print(indexes)
+      self.db_client.query(
+        q.if_(
+          q.not_(
+            q.exists(
+              q.match(
+                q.index("playlist_by_name"),
+                q.casefold(name)
+              )
+            )
+          ),
+          q.create(
+            q.collection("playlists"),
+            {"data": {"name": name}},
+          ),
+          q.get(
+            q.match(
+              q.index("playlist_by_name"),
+              q.casefold(name)
+            )
+          )
+        )
+      )
+
+      playlist = self.db_client.query(
+        q.get(
+          q.match(
+            q.index("playlist_by_name"),
+            q.casefold(name)
+          )
+        )
+      )
+
+      if(playlist):
+        await ctx.send("Playlist já existe, por favor crie uma nova")
+      else:
+        await ctx.send("Playlist criada com sucesso!")
+  
+    except Exception:
+      return False
