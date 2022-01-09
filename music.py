@@ -96,17 +96,13 @@ class bot_music(commands.Cog):
 
       await self.play_music()
   
-  # @commands.command(name="add_playlist", help="Cria uma playlist de músicas")
-  # async def add_playlist(self, ctx, name):
-  #   self.music_playlists.append({"name": name, "musics": []})
-  #   print(self.music_playlists)
-  #   await ctx.send("Playlist criada com sucesso!")
-  
-  # @commands.command(name="add", help="Adiciona música na playlist criada")
-  # async def add(self, ctx, name):
-  #   for i in self.music_playlists:
-  #     print(i[0]["name"])
-
+  @commands.command(name="leave", help="Disconnecting bot from VC")
+  async def leave(self, ctx):
+    if(self.voice == "" or not self.voice.is_connected() or self.voice == None):
+      return
+    else:
+      await self.voice.disconnect()
+      await ctx.send("Bot desconectado do canal de voz")
 
   @commands.command(name="addplaylist", help="Cria uma playlist de músicas")
   async def addplaylist(self, ctx, name):
@@ -151,6 +147,46 @@ class bot_music(commands.Cog):
   
     except Exception:
       return False
+  
+  @commands.command(name="add", help="Adiciona a música na playlist")
+  async def add(self, ctx, playlistName, music):
+    playlistId = self.db_client.query(
+      q.select(
+        "ref",
+        q.get(
+          q.match(
+            q.index("playlist_by_name"),
+            q.casefold(playlistName)
+          )
+        ) 
+      )
+    )
+
+    musicData = { 
+      "playlistId": playlistId,
+      "name": music,
+    }
+    
+    self.db_client.query(
+      q.create(
+        q.collection("musics"),
+        {"data": musicData}
+      )
+    )
+
+    playlistDataName = self.db_client.query(
+      q.select(
+        "data",
+        q.get(
+          q.match(
+            q.index("playlist_by_name"),
+            q.casefold(playlistName)
+          )
+        ) 
+      )
+    )
+
+    await ctx.send("Música adicionada à playlist %s"%(playlistDataName["name"]))
 
   @commands.command(name="leave", help="Disconnecting bot from VC")
   async def leave(self, ctx):
