@@ -143,8 +143,10 @@ class bot_music(commands.Cog):
     except Exception:
       return False
   
-  @commands.command(name="add", help="Adiciona a música na playlist")
-  async def add(self, ctx, playlistName, music):
+  @commands.command(name="add", help="Adiciona a música na playlist, ex: !add playlist/oi lagum")
+  async def add(self, ctx, playlistName, *music):
+    musicName = " ".join(music)
+
     playlistId = self.db_client.query(
       q.select(
         "ref",
@@ -159,7 +161,7 @@ class bot_music(commands.Cog):
 
     musicData = { 
       "playlistId": playlistId,
-      "name": music,
+      "name": musicName,
     }
     
     self.db_client.query(
