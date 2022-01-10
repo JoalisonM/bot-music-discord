@@ -2,3 +2,5 @@ discord
 discord.py[voice]
 youtube_dl
 faunadb
+python-dotenv
+PyNaCl
