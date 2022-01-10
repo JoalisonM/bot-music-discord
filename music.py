@@ -95,92 +95,135 @@ class bot_music(commands.Cog):
   async def queue(self, ctx):
     saida = "```python\nLISTA DE MÚSICAS\n"
     for i in range(len(self.music_queue)):
-      saida += f"[{i}] {self.music_queue[i][2]}.\n"
+      saida += f"[{i}] {self.music_queue[i][2]}.\n" 
     saida += "```"
     await ctx.send(saida)
 
   @commands.command(name="addplaylist", help="Cria uma playlist de músicas")
-  async def addplaylist(self, ctx, name):
+  async def addplaylist(self, ctx, *name):
     try:
+      if(len(name) > 1):
+        await ctx.send("O nome da playlist não pode conter espaços")
+        return
 
-      self.db_client.query(
-        q.if_(
-          q.not_(
-            q.exists(
-              q.match(
-                q.index("playlist_by_name"),
-                q.casefold(name)
-              )
-            )
-          ),
+      name = name[0]
+
+      playlist = self.db_client.query(
+        q.paginate(
+          q.match(
+            q.index("findPlaylistByName"),
+            name
+          )
+        )
+      )
+
+      playlist = playlist['data']
+
+      if(len(playlist) > 0):
+        await ctx.send("Playlist já existe, por favor crie uma nova")
+      else:
+        self.db_client.query(
           q.create(
             q.collection("playlists"),
             {"data": {"name": name}},
-          ),
-          q.get(
-            q.match(
-              q.index("playlist_by_name"),
-              q.casefold(name)
-            )
           )
         )
-      )
-
-      playlist = self.db_client.query(
-        q.get(
-          q.match(
-            q.index("playlist_by_name"),
-            q.casefold(name)
-          )
-        )
-      )
-
-      if(playlist):
-        await ctx.send("Playlist já existe, por favor crie uma nova")
-      else:
         await ctx.send("Playlist criada com sucesso!")
-  
+
     except Exception:
       return False
   
-  @commands.command(name="add", help="Adiciona a música na playlist, ex: !add playlist/oi lagum")
-  async def add(self, ctx, playlistName, *music):
-    musicName = " ".join(music)
+  @commands.command(name="add", help="Adiciona a música na playlist, ex: !add playlist música")
+  async def add(self, ctx, *content):
+    
+    playlistName = content[0]
 
-    playlistId = self.db_client.query(
-      q.select(
-        "ref",
-        q.get(
-          q.match(
-            q.index("playlist_by_name"),
-            q.casefold(playlistName)
-          )
-        ) 
-      )
-    )
+    list = []
+    for i in range(1,len(content)):
+      list.append(content[i])
+
+    musicName = " ".join(list)
 
     musicData = { 
-      "playlistId": playlistId,
+      "playlistName": playlistName,
       "name": musicName,
     }
-    
-    self.db_client.query(
-      q.create(
-        q.collection("musics"),
-        {"data": musicData}
+
+    foundPlaylists = self.db_client.query(
+      q.paginate(
+        q.match(
+          q.index("findPlaylistByName"),
+          playlistName
+        )
       )
     )
 
-    playlistDataName = self.db_client.query(
-      q.select(
-        "data",
-        q.get(
-          q.match(
-            q.index("playlist_by_name"),
-            q.casefold(playlistName)
+    foundPlaylists = foundPlaylists['data']
+
+    if(len(foundPlaylists) > 0):
+      self.db_client.query(
+        q.create(
+          q.collection("musicas"),
+          {"data": musicData}
+        )
+      )
+      await ctx.send("Música adicionada à playlist %s"%(playlistName))
+    else:
+      await ctx.send("Playlist inexistente")
+  
+  @commands.command(name="playlists", help="Retorna todas as playlists")
+  async def playlists(self, ctx):
+    playlists = self.db_client.query(
+      q.map_(
+        q.lambda_(
+          "ref",
+          q.let(
+            {"doc": q.get(q.var("ref"))},
+            {
+              "name": q.select(["data", "name"], q.var("doc")),
+            }
           )
-        ) 
+        ),
+        q.paginate(q.documents(q.collection("playlists")))
       )
     )
 
-    await ctx.send("Música adicionada à playlist %s"%(playlistDataName["name"]))
+    data = playlists["data"]
+
+    saida = "```python\nLISTA DE PLAYLISTS\n"
+    for name in data:
+      saida += (name["name"]) + "\n"
+    saida += "```"
+
+    await ctx.send(saida)
+  
+  @commands.command(name="playlist_musics", help="Toca as músicas da playlist")
+  async def playlist_musics(self, ctx, name):
+    musics = self.db_client.query(
+      q.map_(
+        q.lambda_(
+          "ref",
+          q.let(
+            {"doc": q.get(q.var("ref"))},
+            {
+              "name": q.select(
+                ["data", "name"],
+                q.let({
+                  "playlistExist": q.exists(
+                    q.match(q.index("music_by_playlistName"), name)
+                  )
+                }),
+                q.if_(
+                  q.var("playlistExist"),
+                  q.var("doc"),
+                  q.abort("Foda-se")
+                )
+              ),
+            }
+          )
+        ),
+        q.paginate(q.documents(q.collection("musics")))
+      )
+    )
+
+    print(musics)
