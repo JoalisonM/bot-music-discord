@@ -1,3 +1,4 @@
+import re
 import os
 import discord
 from dotenv import load_dotenv
@@ -79,7 +80,7 @@ class bot_music(commands.Cog):
   
   @commands.command(name="skip", help="Pra pular aquela música que o caba tá abusado")
   async def skip(self, ctx):
-    if self.voice != "" and self.voice:
+    if self.voice != "" and self.voice.is_connected():
       self.voice.stop()
 
       await self.play_music()
@@ -111,7 +112,7 @@ class bot_music(commands.Cog):
       playlist = self.db_client.query(
         q.paginate(
           q.match(
-            q.index("findPlaylistByName"),
+            q.index("playlist_by_name"),
             name
           )
         )
@@ -152,7 +153,7 @@ class bot_music(commands.Cog):
     foundPlaylists = self.db_client.query(
       q.paginate(
         q.match(
-          q.index("findPlaylistByName"),
+          q.index("playlist_by_name"),
           playlistName
         )
       )
@@ -163,7 +164,7 @@ class bot_music(commands.Cog):
     if(len(foundPlaylists) > 0):
       self.db_client.query(
         q.create(
-          q.collection("musicas"),
+          q.collection("musics"),
           {"data": musicData}
         )
       )
@@ -229,19 +230,20 @@ class bot_music(commands.Cog):
   #   print(musics)
   
   @commands.command(name="playplaylist", help="Toca as músicas da playlist")
-  async def playlist_musics(self, ctx, *name):
+  async def playPlaylist(self, ctx, *name):
     try:
       voice_channel = ctx.author.voice.channel
 
       if voice_channel is None:
         await ctx.send("Conecte-se a um canal de voz!")
+        return
 
       playlistName = name[0]
       
       foundPlaylists = self.db_client.query(
         q.paginate(
           q.match(
-            q.index("findPlaylistByName"),
+            q.index("playlist_by_name"),
             playlistName
           )
         )
@@ -256,7 +258,7 @@ class bot_music(commands.Cog):
       foundSongs = self.db_client.query(
         q.paginate(
           q.match(
-            q.index("findMusicByPlaylistName"),
+            q.index("music_by_playlistName"),
             playlistName
           )
         )
@@ -282,6 +284,7 @@ class bot_music(commands.Cog):
         songsNames.append(music['data']['name'])
 
       await ctx.send("Limpando fila de músicas...")
+      self.voice.stop()
       self.music_queue.clear()
       for i in range(len(songsNames)):
         song = self.search_youtube(songsNames[i])
@@ -303,7 +306,7 @@ class bot_music(commands.Cog):
       foundPlaylists = self.db_client.query(
         q.paginate(
           q.match(
-            q.index("findPlaylistByName"),
+            q.index("playlist_by_name"),
             playlistName
           )
         )
@@ -318,7 +321,7 @@ class bot_music(commands.Cog):
       foundSongs = self.db_client.query(
         q.paginate(
           q.match(
-            q.index("findMusicByPlaylistName"),
+            q.index("music_by_playlistName"),
             playlistName
           )
         )
