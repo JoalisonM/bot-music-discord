@@ -197,109 +197,9 @@ class bot_music(commands.Cog):
     saida += "```"
 
     await ctx.send(saida)
-  
-  # @commands.command(name="playlist_musics", help="Toca as músicas da playlist")
-  # async def playlist_musics(self, ctx, name):
-  #   musics = self.db_client.query(
-  #     q.map_(
-  #       q.lambda_(
-  #         "ref",
-  #         q.let(
-  #           {"doc": q.get(q.var("ref"))},
-  #           {
-  #             "name": q.select(
-  #               ["data", "name"],
-  #               q.let({
-  #                 "playlistExist": q.exists(
-  #                   q.match(q.index("music_by_playlistName"), name)
-  #                 )
-  #               }),
-  #               q.if_(
-  #                 q.var("playlistExist"),
-  #                 q.var("doc"),
-  #                 q.abort("Foda-se")
-  #               )
-  #             ),
-  #           }
-  #         )
-  #       ),
-  #       q.paginate(q.documents(q.collection("musics")))
-  #     )
-  #   )
-
-  #   print(musics)
-  
-  @commands.command(name="playplaylist", help="Toca as músicas da playlist")
-  async def playPlaylist(self, ctx, *name):
-    try:
-      voice_channel = ctx.author.voice.channel
-
-      if voice_channel is None:
-        await ctx.send("Conecte-se a um canal de voz!")
-        return
-
-      playlistName = name[0]
-      
-      foundPlaylists = self.db_client.query(
-        q.paginate(
-          q.match(
-            q.index("playlist_by_name"),
-            playlistName
-          )
-        )
-      )
-
-      foundPlaylists = foundPlaylists['data']
-
-      if(len(foundPlaylists) == 0):
-        await ctx.send("Playlist inexistente")
-        return
-
-      foundSongs = self.db_client.query(
-        q.paginate(
-          q.match(
-            q.index("music_by_playlistName"),
-            playlistName
-          )
-        )
-      )
-
-      foundSongs = foundSongs['data']
-
-      if(len(foundSongs) == 0):
-        await ctx.send("Você ainda não adicionou nenhuma música a essa playlist")
-        return
-
-      ids = re.findall("\d+",str(foundSongs))
-      songsNames = []
-      for i in range(len(ids)):
-        id = ids[i]
-        music = self.db_client.query(
-          q.get(
-            q.ref(
-              q.collection("musics"), id
-            )
-          )
-        )
-        songsNames.append(music['data']['name'])
-
-      await ctx.send("Limpando fila de músicas...")
-      self.voice.stop()
-      self.music_queue.clear()
-      for i in range(len(songsNames)):
-        song = self.search_youtube(songsNames[i])
-        self.music_queue.append([song, voice_channel, songsNames[i]])
-        await ctx.send(f"{songsNames[i]} adicionada à fila...")
-
-
-      await self.play_music()
-      await ctx.send("Tocando playlist")
-
-    except:
-      return
 
   @commands.command(name="listplaylist", help="Lista as músicas da playlist")
-  async def listplaylist(self, ctx, *name):
+  async def listPlaylist(self, ctx, *name):
     try:
       playlistName = name[0]
       
@@ -319,34 +219,37 @@ class bot_music(commands.Cog):
         return
 
       foundSongs = self.db_client.query(
-        q.paginate(
-          q.match(
-            q.index("music_by_playlistName"),
-            playlistName
+        q.map_(
+          q.lambda_(
+            "ref",
+            q.let(
+              {"doc": q.get(q.var("ref"))},
+              {
+                "name": q.select(["data", "name"], q.var("doc")),
+              }
+            )
+          ),
+          q.paginate(
+            q.match(
+              q.index("music_by_playlistName"),
+              playlistName
+            )
           )
         )
       )
 
-      foundSongs = foundSongs['data']
+      foundSongs = foundSongs["data"]
 
       if(len(foundSongs) == 0):
         await ctx.send("Você ainda não adicionou nenhuma música a essa playlist")
         return
 
-      ids = re.findall("\d+",str(foundSongs))
       songsNames = []
-      for i in range(len(ids)):
-        id = ids[i]
-        music = self.db_client.query(
-          q.get(
-            q.ref(
-              q.collection("musics"), id
-            )
-          )
-        )
-        songsNames.append(music['data']['name'])
+      for music in foundSongs:
+        songsNames.append(music['name'])
 
       saida = "```python\n"
+      saida += f"Músicas da playlist **{playlistName}**\n"
       for i in range(len(songsNames)):
         saida += f"[{i}] {songsNames[i]}.\n"
       saida += "```"
@@ -355,3 +258,57 @@ class bot_music(commands.Cog):
 
     except:
       await ctx.send("Um erro ocorreu")
+
+  @commands.command(name="playplaylist", help="Toca as músicas da playlist")
+  async def playPlaylist(self, ctx, *name):
+    try:
+      voice_channel = ctx.author.voice.channel
+
+      if voice_channel is None:
+        await ctx.send("Conecte a um canal de voz!")
+
+      playlistName = name[0]
+
+      foundSongs = self.db_client.query(
+        q.map_(
+          q.lambda_(
+            "ref",
+            q.let(
+              {"doc": q.get(q.var("ref"))},
+              {
+                "name": q.select(["data", "name"], q.var("doc")),
+              }
+            )
+          ),
+          q.paginate(
+            q.match(
+              q.index("music_by_playlistName"),
+              playlistName
+            )
+          )
+        )
+      )
+
+      foundSongs = foundSongs["data"]
+
+      if(len(foundSongs) == 0):
+          await ctx.send("Você ainda não adicionou nenhuma música a essa playlist ou ela não existe")
+          return
+      
+      songsNames = []
+      for music in foundSongs:
+        songsNames.append(music['name'])
+
+      await ctx.send("Baixando músicas da playlist...")
+      if self.voice != "" and self.voice.is_connected():
+        self.voice.stop()
+      self.music_queue.clear()
+      for i in range(len(songsNames)):
+        song = self.search_youtube(songsNames[i])
+        self.music_queue.append([song, voice_channel, songsNames[i]])
+
+      await self.play_music()
+      await ctx.send("Tocando playlist")
+
+    except:
+      return
