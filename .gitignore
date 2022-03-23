@@ -1,3 +1,4 @@
 token.txt
-
-.env
+__pycache__/
+env/
+.env copy

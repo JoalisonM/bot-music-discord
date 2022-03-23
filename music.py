@@ -1,5 +1,5 @@
-import re
 import os
+import random
 import discord
 from dotenv import load_dotenv
 from discord.ext import commands
@@ -58,6 +58,132 @@ class bot_music(commands.Cog):
     else:
    
       self.is_playing = False
+
+  def createCollections(self):
+    try: 
+      self.db_client.query(
+        q.if_(
+          q.not_(
+            q.exists(
+              q.collection("musics")
+            )
+          ),
+          q.create_collection("musics"),
+          q.index("musics")
+        )
+      )
+
+      self.db_client.query(
+        q.if_(
+          q.not_(
+            q.exists(
+              q.collection("playlists")
+            )
+          ),
+          q.create_collection("playlists"),
+          q.index("playlists")
+        )
+      )
+    except:
+      return
+  
+  def createIndexes(self):
+    try:
+      self.db_client.query(
+        q.if_(
+          q.not_(
+            q.exists(
+              q.index("music_by_name")
+            )
+          ),
+          q.create_index({
+            "name": "music_by_name",
+            "source": q.collection("musics"),
+            "terms": [{"field": ["data", "name"]}]
+          }),
+          q.index("music_by_name")
+        )
+      )
+
+      self.db_client.query(
+        q.if_(
+          q.not_(
+            q.exists(
+              q.index("music_by_playlistName")
+            )
+          ),
+          q.create_index({
+            "name": "music_by_playlistName",
+            "source": q.collection("musics"),
+            "terms": [{"field": ["data", "playlistName"]}]
+          }),
+          q.index("music_by_playlistName")
+        )
+      )
+
+      self.db_client.query(
+        q.if_(
+          q.not_(
+            q.exists(
+              q.index("playlist_by_name")
+            )
+          ),
+          q.create_index({
+            "name": "playlist_by_name",
+            "source": q.collection("playlists"),
+            "terms": [{"field": ["data", "name"]}]
+          }),
+          q.index("playlist_by_name")
+        )
+      )
+    except:
+      return
+  
+  def searchSong(self, musicName):
+    foundSong = self.db_client.query(
+      q.map_(
+        q.lambda_(
+          "search",
+          q.let(
+            {"doc": q.get(q.var("search"))},
+            {
+              "id": q.select(["ref", "id"], q.var("doc")),
+            }
+          )
+        ),
+        q.paginate(
+          q.match(
+            q.index("music_by_name"),
+            musicName
+          )
+        )
+      )
+    )
+
+    return foundSong["data"][0]["id"]
+  
+  def searchSongsByPlaylist(self, playlistName):
+    foundSongs = self.db_client.query(
+      q.map_(
+        q.lambda_(
+          "ref",
+          q.let(
+            {"doc": q.get(q.var("ref"))},
+            {
+              "name": q.select(["data", "name"], q.var("doc")),
+            }
+          )
+        ),
+        q.paginate(
+          q.match(
+            q.index("music_by_playlistName"),
+            playlistName
+          )
+        )
+      )
+    )
+    
+    return foundSongs["data"]
   
   @commands.command(name="play", help="Toca o som dj")
   async def play(self, ctx, *args):
@@ -85,7 +211,7 @@ class bot_music(commands.Cog):
 
       await self.play_music()
   
-  @commands.command(name="leave", help="Disconnecting bot from VC")
+  @commands.command(name="leave", help="Desconecta o bot do canal de voz")
   async def leave(self, ctx):
     if(self.voice == "" or not self.voice.is_connected() or self.voice == None):
       return
@@ -108,6 +234,9 @@ class bot_music(commands.Cog):
         return
 
       name = name[0]
+
+      self.createCollections()
+      self.createIndexes()
 
       playlist = self.db_client.query(
         q.paginate(
@@ -136,7 +265,6 @@ class bot_music(commands.Cog):
   
   @commands.command(name="add", help="Adiciona a música na playlist, ex: !add playlist música")
   async def add(self, ctx, *content):
-    
     playlistName = content[0]
 
     list = []
@@ -218,27 +346,7 @@ class bot_music(commands.Cog):
         await ctx.send("Playlist inexistente")
         return
 
-      foundSongs = self.db_client.query(
-        q.map_(
-          q.lambda_(
-            "ref",
-            q.let(
-              {"doc": q.get(q.var("ref"))},
-              {
-                "name": q.select(["data", "name"], q.var("doc")),
-              }
-            )
-          ),
-          q.paginate(
-            q.match(
-              q.index("music_by_playlistName"),
-              playlistName
-            )
-          )
-        )
-      )
-
-      foundSongs = foundSongs["data"]
+      foundSongs = self.searchSongsByPlaylist(playlistName)
 
       if(len(foundSongs) == 0):
         await ctx.send("Você ainda não adicionou nenhuma música a essa playlist")
@@ -269,27 +377,7 @@ class bot_music(commands.Cog):
 
       playlistName = name[0]
 
-      foundSongs = self.db_client.query(
-        q.map_(
-          q.lambda_(
-            "ref",
-            q.let(
-              {"doc": q.get(q.var("ref"))},
-              {
-                "name": q.select(["data", "name"], q.var("doc")),
-              }
-            )
-          ),
-          q.paginate(
-            q.match(
-              q.index("music_by_playlistName"),
-              playlistName
-            )
-          )
-        )
-      )
-
-      foundSongs = foundSongs["data"]
+      foundSongs = self.searchSongsByPlaylist(playlistName)
 
       if(len(foundSongs) == 0):
           await ctx.send("Você ainda não adicionou nenhuma música a essa playlist ou ela não existe")
@@ -298,6 +386,8 @@ class bot_music(commands.Cog):
       songsNames = []
       for music in foundSongs:
         songsNames.append(music['name'])
+      
+      random.shuffle(songsNames)
 
       await ctx.send("Baixando músicas da playlist...")
       if self.voice != "" and self.voice.is_connected():
@@ -311,4 +401,45 @@ class bot_music(commands.Cog):
       await ctx.send("Tocando playlist")
 
     except:
+      return
+
+  @commands.command(name="delete", help="Deleta uma música da playlist")
+  async def deleteMusic(self, ctx, *content):
+    try:
+      playlistName = content[0]
+
+      list = []
+      for i in range(1,len(content)):
+        list.append(content[i])
+
+      musicName = " ".join(list)
+
+      musicId = self.searchSong(musicName)
+
+      self.db_client.query(
+        q.if_(
+          q.and_(
+            q.exists(
+              q.match(
+                q.index("music_by_playlistName"),
+                playlistName
+              )
+            ),
+            q.exists(
+              q.match(
+                q.index("music_by_name"),
+                musicName
+              )
+            )
+          ),
+          q.delete(
+            q.ref(q.collection("musics"), musicId)
+          ),
+          False
+        )
+      )
+
+      await ctx.send("Música deletada com sucesso!")
+    except:
+      await ctx.send("Playlist ou música não existem!")
       return
