@@ -15,6 +15,7 @@ Visite [esta página](https://discord.com/developers/applications) do discord pa
 ![first step](./images/1.png)
 
 Adicione o nome do bot e clique em **create**.
+
 ![second step](./images/2.png)
 
 Logo após isso, estaremos em uma nova página, no canto esquerdo clique em **Bot** e na direita selecione **Add Bot**.
